@@ -18,6 +18,11 @@ namespace StwalkerCoordBot
     public class Program
     {
         /// <summary>
+        /// Template for the bot to use.
+        /// </summary>
+        private static string format = "{{{{coord|{0}|N|{1}|E|display=inline,title}}}}";
+
+        /// <summary>
         /// Main method, initialises the bot
         /// </summary>
         /// <param name="args">Program arguments passed to the executable</param>
@@ -33,6 +38,7 @@ namespace StwalkerCoordBot
             if (fi.Extension == ".kml")
             {
                 RunBot(GetLocations(args[0]));
+                Console.ReadLine();
             }
         }
 
@@ -57,7 +63,9 @@ namespace StwalkerCoordBot
 
             foreach (KeyValuePair<string, Location> locationData in locations)
             {
-                Console.WriteLine("[[" + locationData.Key + "]]: " + locationData.Value.Latitude + " N, " + locationData.Value.Longitude + " E");
+                ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
+
+                Console.WriteLine("[[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude));
             }
         }
 
@@ -73,24 +81,26 @@ namespace StwalkerCoordBot
             XPathDocument xpd = new XPathDocument(filePath);
             XPathNavigator xpn = xpd.CreateNavigator();
             XPathNodeIterator xpni = xpn.Select("//Placemark");
-
-            while (xpni.MoveNext())
+            bool first = true;
+            while (first || xpni.MoveNext())
             {
+                first = false;
                 string article = string.Empty;
                 string coord = string.Empty;
 
                 XmlReader xr = xpni.Current.ReadSubtree();
+                
                 while (xr.Read())
                 {
                     if (xr.Name == "name")
                     {
-                        article = xr.ReadContentAsString();
+                        article = xr.ReadElementContentAsString();
                     }
 
                     if (xr.Name == "Point")
                     {
                         xr.Read();
-                        coord = xr.ReadContentAsString();
+                        coord = xr.ReadElementContentAsString();
                     }
                 }
 
