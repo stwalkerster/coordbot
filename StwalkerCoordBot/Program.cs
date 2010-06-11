@@ -38,6 +38,7 @@ namespace StwalkerCoordBot
             if (fi.Extension == ".kml")
             {
                 RunBot(GetLocations(args[0]));
+                Console.WriteLine("<!-- Done -->");
                 Console.ReadLine();
             }
         }
@@ -82,8 +83,9 @@ namespace StwalkerCoordBot
             XPathNavigator xpn = xpd.CreateNavigator();
             XPathNodeIterator xpni = xpn.Select("//Placemark");
             bool first = true;
-            while (first || xpni.MoveNext())
+            while (xpni.MoveNext())
             {
+                
                 first = false;
                 string article = string.Empty;
                 string coord = string.Empty;
