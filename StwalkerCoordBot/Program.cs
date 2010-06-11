@@ -53,7 +53,7 @@ namespace StwalkerCoordBot
         /// </summary>
         private static void PrintHelp()
         {
-            Console.WriteLine("Usage: mono coordbot.exe <kml file>");
+            Console.WriteLine("Usage: mono coordbot.exe <kml file> <report email>");
         }
 
         /// <summary>
@@ -103,7 +103,11 @@ namespace StwalkerCoordBot
 
             XPathDocument xpd = new XPathDocument(filePath);
             XPathNavigator xpn = xpd.CreateNavigator();
-            XPathNodeIterator xpni = xpn.Select("//Placemark");
+            XmlNamespaceManager xnm = new XmlNamespaceManager(xpn.NameTable);
+            xnm.AddNamespace("gx", "http://www.google.com/kml/ext/2.2");
+            xnm.AddNamespace("kml", "http://www.opengis.net/kml/2.2");
+            XPathExpression xpath = XPathExpression.Compile("//kml:Placemark", xnm);
+            XPathNodeIterator xpni = xpn.Select(xpath);
             bool first = true;
             while (xpni.MoveNext())
             {
@@ -112,7 +116,7 @@ namespace StwalkerCoordBot
                 string coord = string.Empty;
 
                 XmlReader xr = xpni.Current.ReadSubtree();
-                
+
                 while (xr.Read())
                 {
                     if (xr.Name == "name")
