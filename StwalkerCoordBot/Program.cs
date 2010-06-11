@@ -23,23 +23,28 @@ namespace StwalkerCoordBot
         private static string format = "{{{{coord|{0}|N|{1}|E|display=inline,title}}}}";
 
         /// <summary>
+        /// Email address to send the report to.
+        /// </summary>
+        private static string reportEmail = "stwalkerster@helpmebot.org.uk";
+
+        /// <summary>
         /// Main method, initialises the bot
         /// </summary>
         /// <param name="args">Program arguments passed to the executable</param>
         public static void Main(string[] args)
         {
-            if (args.Length != 1)
+            if (args.Length != 2)
             {
                 PrintHelp();
                 return;
             }
 
+            reportEmail = args[1];
+
             FileInfo fi = new FileInfo(args[0]);
             if (fi.Extension == ".kml")
             {
                 RunBot(GetLocations(args[0]));
-                Console.WriteLine("<!-- Done -->");
-                Console.ReadLine();
             }
         }
 
@@ -62,12 +67,29 @@ namespace StwalkerCoordBot
                 return;
             }
 
+            string report = "StwalkerCoordBot report:\n";
+
             foreach (KeyValuePair<string, Location> locationData in locations)
             {
                 ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
 
-                Console.WriteLine("[[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude));
+                report += "[[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
             }
+
+            SendReport(report);
+        }
+
+        /// <summary>
+        /// Sends a report to the operator of the bot
+        /// </summary>
+        /// <param name="report">the report to be sent</param>
+        private static void SendReport(string report)
+        {
+            System.Net.Mail.MailMessage mail = new System.Net.Mail.MailMessage("stwalkercoordbot@helpmebot.org.uk", reportEmail);
+            mail.Body = report;
+            mail.Subject = "StwalkerCoordBot report";
+            System.Net.Mail.SmtpClient smtp = new System.Net.Mail.SmtpClient("helpmebot.org.uk");
+            smtp.Send(mail);
         }
 
         /// <summary>
@@ -85,7 +107,6 @@ namespace StwalkerCoordBot
             bool first = true;
             while (xpni.MoveNext())
             {
-                
                 first = false;
                 string article = string.Empty;
                 string coord = string.Empty;
