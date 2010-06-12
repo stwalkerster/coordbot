@@ -12,6 +12,7 @@ namespace StwalkerCoordBot
     using System.Xml;
     using System.Xml.XPath;
     using Utility.Net.MediaWiki;
+    using System.Text.RegularExpressions;
 
     /// <summary>
     /// Main bot class
@@ -21,14 +22,20 @@ namespace StwalkerCoordBot
         /// <summary>
         /// Template for the bot to use.
         /// </summary>
-        private static string format = "{{{{coord|{0}|N|{1}|E|display=inline,title}}}}";
+        private static string coordInlineTitle = "{{{{coord|{0}|N|{1}|E|display=inline,title}}}}";
+        private static string coordInline = "{{{{coord|{0}|N|{1}|E|display=inline}}}}";
+        private static string coordTitle = "{{{{coord|{0}|N|{1}|E|display=title}}}}";
 
         /// <summary>
         /// Email address to send the report to.
         /// </summary>
         private static string reportEmail = "stwalkerster@helpmebot.org.uk";
+        private static string reportPage = "User:Stwalkerbot/Coordinates report";
+        private static string report = "";
 
-        private static Utility.Net.MediaWiki.MediaWikiApi api;
+        private static string username;
+
+        private static MediaWikiApi api;
 
         /// <summary>
         /// Main method, initialises the bot
@@ -47,7 +54,7 @@ namespace StwalkerCoordBot
             api = new Utility.Net.MediaWiki.MediaWikiApi();
 
             Console.Write("Bot username: ");
-            string username = Console.ReadLine();
+            username = Console.ReadLine();
             Console.Write("Bot password: ");
             string password = Console.ReadLine();
 
@@ -56,6 +63,8 @@ namespace StwalkerCoordBot
             FileInfo fi = new FileInfo(args[0]);
             if (fi.Extension == ".kml")
             {
+                report += ":Using KML file: " + args[0] + "\n";
+
                 RunBot(GetLocations(args[0]));
             }
         }
@@ -79,16 +88,45 @@ namespace StwalkerCoordBot
                 return;
             }
 
-            string report = "StwalkerCoordBot report:\n";
+
 
             foreach (KeyValuePair<string, Location> locationData in locations)
             {
-                ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
 
-                report += "* [[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
+                    ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
+                try
+                {
+                    report += ":* [[" + locationData.Key + "]]: " + string.Format(coordInline, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
+
+                    string text = "";
+                    try
+                    {
+                        text = api.GetPageContent(locationData.Key);
+                    }
+                    catch (MediaWikiException ex)
+                    {
+                        report += "::Error retriving page contents: " + ex.Message + "\n:::Skipping.\n";
+                        continue;
+                    }
+
+                    if (ApplyCoords(ref text, locationData.Value))
+                    {
+                        try
+                        {
+                            api.Edit(locationData.Key, text, "Adding coordinates from KML file ([[WP:BOT|BOT]])", MediaWikiApi.ACTION_EDIT_EXISTS_DOESEXIST, true, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_ALL);
+                        }
+                        catch (MediaWikiException ex)
+                        {
+                            report += "::Error saving page: " + ex.Message + "\n:::Skipping.\n";
+                            continue;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    report += "::Error: " + ex.Message + "\n:::Skipping.\n";
+                }
             }
-
-            api.Edit("User:Stwalkerbot/Test", report, "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
 
             SendReport(report);
         }
@@ -99,11 +137,58 @@ namespace StwalkerCoordBot
         /// <param name="report">the report to be sent</param>
         private static void SendReport(string report)
         {
+            try
+            {
+                api.Edit(reportPage, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
+            }
+            catch (MediaWikiException ex)
+            {
+                report += "Error saving report to wiki: " + ex.Message + "\n";
+            }
+
             System.Net.Mail.MailMessage mail = new System.Net.Mail.MailMessage("stwalkercoordbot@helpmebot.org.uk", reportEmail);
             mail.Body = report;
             mail.Subject = "StwalkerCoordBot report";
             System.Net.Mail.SmtpClient smtp = new System.Net.Mail.SmtpClient("helpmebot.org.uk");
             smtp.Send(mail);
+        }
+
+        private static bool ApplyCoords(ref string wikitext, Location coords)
+        {
+            string wtBackup = wikitext;
+
+            if (Regex.IsMatch(wikitext, @"\{\{(nobots|bots\|(allow=none|deny=(?!none).*(" + username.Normalize() + @"|all)|optout=all))\}\}", RegexOptions.IgnoreCase))
+            {
+                report += "::Bot excluded from page.\n";
+                return false;
+            }
+
+            if (Regex.IsMatch(wikitext, @"\{\{[Cc]oord\|"))
+            {
+                report += "::Already has coordinates template, skipping.\n";
+                return false;
+            }
+
+            string pattern = @"^\|[ ]*coordinates[ ]*=[ ]*$";
+            string replacement = "| coordinates = " + string.Format(coordInlineTitle, coords.Latitude, coords.Longitude);
+            wikitext = Regex.Replace(wikitext, pattern, replacement, RegexOptions.Multiline);
+
+            pattern = @"^\|[ ]*coords[ ]*=[ ]*$";
+            replacement = "| coords = " + string.Format(coordInlineTitle, coords.Latitude, coords.Longitude);
+            wikitext = Regex.Replace(wikitext, pattern, replacement, RegexOptions.Multiline);
+
+            if (!wikitext.Equals(wtBackup))
+            {
+                report += "::Added coordinates to infobox.(display=inline,title)\n";
+            }
+
+            else
+            {
+                wikitext = wikitext + "\n\n" + string.Format(coordTitle, coords.Latitude, coords.Longitude);
+                report += "::Added coordinates to end of article.(display=title)\n";
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -149,6 +234,8 @@ namespace StwalkerCoordBot
 
                 locs.Add(article, loc);
             }
+
+            report += string.Format(":Found {0} coordinate pairs.\n", locs.Count);
 
             return locs;
         }
