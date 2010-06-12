@@ -11,6 +11,7 @@ namespace StwalkerCoordBot
     using System.Text;
     using System.Xml;
     using System.Xml.XPath;
+    using Utility.Net.MediaWiki;
 
     /// <summary>
     /// Main bot class
@@ -27,6 +28,8 @@ namespace StwalkerCoordBot
         /// </summary>
         private static string reportEmail = "stwalkerster@helpmebot.org.uk";
 
+        private static Utility.Net.MediaWiki.MediaWikiApi api;
+
         /// <summary>
         /// Main method, initialises the bot
         /// </summary>
@@ -41,7 +44,7 @@ namespace StwalkerCoordBot
 
             reportEmail = args[1];
 
-            Utility.Net.MediaWiki.MediaWikiApi api = new Utility.Net.MediaWiki.MediaWikiApi();
+            api = new Utility.Net.MediaWiki.MediaWikiApi();
 
             Console.Write("Bot username: ");
             string username = Console.ReadLine();
@@ -84,6 +87,8 @@ namespace StwalkerCoordBot
 
                 report += "* [[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
             }
+
+            api.Edit("User:Stwalkerbot/Test", report, "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
 
             SendReport(report);
         }
