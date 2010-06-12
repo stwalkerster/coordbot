@@ -41,6 +41,15 @@ namespace StwalkerCoordBot
 
             reportEmail = args[1];
 
+            Utility.Net.MediaWiki.MediaWikiApi api = new Utility.Net.MediaWiki.MediaWikiApi();
+
+            Console.Write("Bot username: ");
+            string username = Console.ReadLine();
+            Console.Write("Bot password: ");
+            string password = Console.ReadLine();
+
+            api.Login(username, password);
+
             FileInfo fi = new FileInfo(args[0]);
             if (fi.Extension == ".kml")
             {
@@ -108,10 +117,8 @@ namespace StwalkerCoordBot
             xnm.AddNamespace("kml", "http://www.opengis.net/kml/2.2");
             XPathExpression xpath = XPathExpression.Compile("//kml:Placemark", xnm);
             XPathNodeIterator xpni = xpn.Select(xpath);
-            bool first = true;
             while (xpni.MoveNext())
             {
-                first = false;
                 string article = string.Empty;
                 string coord = string.Empty;
 
