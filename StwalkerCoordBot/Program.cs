@@ -73,7 +73,7 @@ namespace StwalkerCoordBot
             {
                 ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
 
-                report += "[[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
+                report += "* [[" + locationData.Key + "]]: " + string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
             }
 
             SendReport(report);
