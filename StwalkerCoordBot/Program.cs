@@ -92,7 +92,7 @@ namespace StwalkerCoordBot
 
             foreach (KeyValuePair<string, Location> locationData in locations)
             {
-
+                Console.WriteLine("Page: " + locationData.Key);
                     ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
                 try
                 {
