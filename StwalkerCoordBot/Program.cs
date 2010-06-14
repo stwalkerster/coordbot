@@ -33,6 +33,13 @@ namespace StwalkerCoordBot
         private static string reportPage = "User:Stwalkerbot/Coordinates report";
         private static string report = "";
 
+        private static bool silent = false;
+        private static bool summaryEdit = true;
+        private static bool doEdits = true;
+        private static int editLimit = -1;
+        private static int editCount = 0;
+
+
         private static string username;
 
         private static MediaWikiApi api;
@@ -43,15 +50,15 @@ namespace StwalkerCoordBot
         /// <param name="args">Program arguments passed to the executable</param>
         public static void Main(string[] args)
         {
-            if (args.Length != 2)
+            if (args.Length < 1)
             {
                 PrintHelp();
                 return;
             }
 
-            reportEmail = args[1];
-
             api = new Utility.Net.MediaWiki.MediaWikiApi();
+
+            SetOptions(args);
 
             Console.Write("Bot username: ");
             username = Console.ReadLine();
@@ -69,12 +76,37 @@ namespace StwalkerCoordBot
             }
         }
 
+        private static void SetOptions(string[] args)
+        {
+            if (args.Contains("--silent"))
+            {
+                silent = true;
+            }
+
+            if (args.Contains("--nosummaryedit"))
+                summaryEdit = false;
+
+            if (args.Contains("--noedit"))
+                doEdits = false;
+
+            if (args.Contains("--editlimit"))
+            {
+
+            }
+        }
+
         /// <summary>
         /// Prints out useage help if invalid params are given
         /// </summary>
         private static void PrintHelp()
         {
-            Console.WriteLine("Usage: mono coordbot.exe <kml file> <report email>");
+            Console.WriteLine("Usage: mono coordbot.exe <kml file> [options]");
+            Console.WriteLine();
+            Console.WriteLine("Options available:");
+            Console.WriteLine("    --silent            No console log messages.");
+            Console.WriteLine("    --nosummaryedit     Don't leave a summary on the summary page.");
+            Console.WriteLine("    --noedit            Don't edit at all.");
+            Console.WriteLine("    --editlimit <n>     Only make <n> edits.");
         }
 
         /// <summary>
@@ -113,7 +145,11 @@ namespace StwalkerCoordBot
                     {
                         try
                         {
-                            api.Edit(locationData.Key, text, "Adding coordinates from KML file ([[WP:BOT|BOT]])", MediaWikiApi.ACTION_EDIT_EXISTS_DOESEXIST, true, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_ALL);
+                            if (!doEdit(locationData.Key, text, "Adding coordinates from KML file ([[WP:BOT|BOT]])", MediaWikiApi.ACTION_EDIT_EXISTS_DOESEXIST, true, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_ALL))
+                            {// one edit remaining, please report
+                                report += "::Edit limit too low. Terminating bot run.";
+                                break;
+                            }
                         }
                         catch (MediaWikiException ex)
                         {
@@ -139,7 +175,11 @@ namespace StwalkerCoordBot
         {
             try
             {
-                api.Edit(reportPage, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
+                if (summaryEdit)
+                {
+                    api.Edit(reportPage, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
+                    editCount++;
+                }
             }
             catch (MediaWikiException ex)
             {
@@ -239,6 +279,24 @@ namespace StwalkerCoordBot
 
             return locs;
         }
+
+        private static bool doEdit(string title, string text, string summary, int exists, bool minor, bool bot, int location, int section)
+        {
+            if (editLimit == -1 || editLimit > ( summaryEdit ? editCount + 1 : editCount ))
+            {
+                if (doEdits)
+                    api.Edit(title, text, summary, exists, minor, bot, location, section);
+                else
+                    report += "::Editing disabled. Edit not saved.";
+                editCount++;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
 
         /// <summary>
         /// A location structure which holds the Lat/Long information
