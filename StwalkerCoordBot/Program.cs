@@ -65,7 +65,7 @@ namespace StwalkerCoordBot
             Console.Write("Bot password: ");
             string password = Console.ReadLine();
 
-            _api.Login(_username, password);
+            _api.login(_username, password);
 
             FileInfo fi = new FileInfo(args[0]);
 
@@ -125,7 +125,7 @@ namespace StwalkerCoordBot
                     string text;
                     try
                     {
-                        text = _api.GetPageContent(locationData.Key);
+                        text = _api.getPageContent(locationData.Key);
                     }
                     catch (MediaWikiException ex)
                     {
@@ -169,7 +169,7 @@ namespace StwalkerCoordBot
             {
                 if (_summaryEdit)
                 {
-                    _api.Edit(REPORT_PAGE, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
+                    _api.edit(REPORT_PAGE, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
                     _editCount++;
                 }
             }
@@ -277,7 +277,7 @@ namespace StwalkerCoordBot
         private static bool doEdit(string title, string text, string summary, int exists, bool minor, bool bot, int location, int section)
         {
                 if (_doEdits)
-                    _api.Edit(title, text, summary, exists, minor, bot, location, section);
+                    _api.edit(title, text, summary, exists, minor, bot, location, section);
                 else
                     _report += "::Editing disabled. Edit not saved.";
                 _editCount++;
