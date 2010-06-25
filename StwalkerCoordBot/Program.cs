@@ -8,7 +8,6 @@ namespace StwalkerCoordBot
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using System.Text;
     using System.Xml;
     using System.Xml.XPath;
     using Utility.Net.MediaWiki;
@@ -22,83 +21,79 @@ namespace StwalkerCoordBot
         /// <summary>
         /// Template for the bot to use.
         /// </summary>
-        private static string coordInlineTitle = "{{{{coord|{0}|N|{1}|E|display=inline,title}}}}";
-        private static string coordInline = "{{{{coord|{0}|N|{1}|E|display=inline}}}}";
-        private static string coordTitle = "{{{{coord|{0}|N|{1}|E|display=title}}}}";
+        private const string COORD_INLINE_TITLE = "{{{{coord|{0}|N|{1}|E|display=inline,title}}}}";
+        private const string COORD_INLINE = "{{{{coord|{0}|N|{1}|E|display=inline}}}}";
+        private const string COORD_TITLE = "{{{{coord|{0}|N|{1}|E|display=title}}}}";
 
         /// <summary>
         /// Email address to send the report to.
         /// </summary>
-        private static string reportEmail = "stwalkerster@helpmebot.org.uk";
-        private static string reportPage = "User:Stwalkerbot/Coordinates report";
-        private static string report = "";
+        private const string REPORT_EMAIL = "stwalkerster@helpmebot.org.uk";
+        private const string REPORT_PAGE = "User:Stwalkerbot/Coordinates report";
+        private static string _report = "";
 
-        private static bool silent = false;
-        private static bool summaryEdit = true;
-        private static bool doEdits = true;
-        private static int editLimit = -1;
-        private static int editCount = 0;
+        private static bool _silent;
+        private static bool _summaryEdit = true;
+        private static bool _doEdits = true;
+        private static int _editCount;
 
 
-        private static string username;
+        private static string _username;
 
-        private static MediaWikiApi api;
+        private static MediaWikiApi _api;
 
         /// <summary>
         /// Main method, initialises the bot
         /// </summary>
         /// <param name="args">Program arguments passed to the executable</param>
+// ReSharper disable InconsistentNaming
         public static void Main(string[] args)
+// ReSharper restore InconsistentNaming
         {
             if (args.Length < 1)
             {
-                PrintHelp();
+                printHelp();
                 return;
             }
 
-            api = new Utility.Net.MediaWiki.MediaWikiApi();
+            _api = new MediaWikiApi();
 
-            SetOptions(args);
+            setOptions(args);
 
             Console.Write("Bot username: ");
-            username = Console.ReadLine();
+            _username = Console.ReadLine();
             Console.Write("Bot password: ");
             string password = Console.ReadLine();
 
-            api.Login(username, password);
+            _api.Login(_username, password);
 
             FileInfo fi = new FileInfo(args[0]);
-            if (fi.Extension == ".kml")
-            {
-                report += ":Using KML file: " + args[0] + "\n";
 
-                RunBot(GetLocations(args[0]));
-            }
+            if (fi.Extension != ".kml") return;
+
+            _report += ":Using KML file: " + args[0] + "\n";
+
+            runBot(getLocations(args[0]));
         }
 
-        private static void SetOptions(string[] args)
+        private static void setOptions(IEnumerable<string> args)
         {
             if (args.Contains("--silent"))
             {
-                silent = true;
+                _silent = true;
             }
 
             if (args.Contains("--nosummaryedit"))
-                summaryEdit = false;
+                _summaryEdit = false;
 
             if (args.Contains("--noedit"))
-                doEdits = false;
-
-            if (args.Contains("--editlimit"))
-            {
-
-            }
+                _doEdits = false;
         }
 
         /// <summary>
         /// Prints out useage help if invalid params are given
         /// </summary>
-        private static void PrintHelp()
+        private static void printHelp()
         {
             Console.WriteLine("Usage: mono coordbot.exe <kml file> [options]");
             Console.WriteLine();
@@ -113,72 +108,69 @@ namespace StwalkerCoordBot
         /// Main bot method that executes everything needed
         /// </summary>
         /// <param name="locations">Dictionary of locations, generated from the kml by getLocations sub</param>
-        private static void RunBot(Dictionary<string, Location> locations)
+        private static void runBot(Dictionary<string, Location> locations)
         {
             if (locations == null)
-            {
                 return;
-            }
-
 
 
             foreach (KeyValuePair<string, Location> locationData in locations)
             {
-                Console.WriteLine("Page: " + locationData.Key);
+                if(!_silent) Console.WriteLine("Page: " + locationData.Key);
                     ////string.Format(format, locationData.Value.Latitude, locationData.Value.Longitude);
                 try
                 {
-                    report += ":* [[" + locationData.Key + "]]: " + string.Format(coordInline, locationData.Value.Latitude, locationData.Value.Longitude) + "\n";
+                    _report += ":* [[" + locationData.Key + "]]: " + string.Format(COORD_INLINE, locationData.Value.latitude, locationData.Value.longitude) + "\n";
 
-                    string text = "";
+                    string text;
                     try
                     {
-                        text = api.GetPageContent(locationData.Key);
+                        text = _api.GetPageContent(locationData.Key);
                     }
                     catch (MediaWikiException ex)
                     {
-                        report += "::Error retriving page contents: " + ex.Message + "\n:::Skipping.\n";
+                        _report += "::Error retriving page contents: " + ex.Message + "\n:::Skipping.\n";
                         continue;
                     }
 
-                    if (ApplyCoords(ref text, locationData.Value))
+                    if (applyCoords(ref text, locationData.Value))
                     {
                         try
                         {
                             if (!doEdit(locationData.Key, text, "Adding coordinates from KML file ([[WP:BOT|BOT]])", MediaWikiApi.ACTION_EDIT_EXISTS_DOESEXIST, true, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_ALL))
                             {// one edit remaining, please report
-                                report += "::Edit limit too low. Terminating bot run.";
+                                _report += "::Edit limit too low. Terminating bot run.";
                                 break;
                             }
                         }
                         catch (MediaWikiException ex)
                         {
-                            report += "::Error saving page: " + ex.Message + "\n:::Skipping.\n";
+                            _report += "::Error saving page: " + ex.Message + "\n:::Skipping.\n";
                             continue;
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    report += "::Error: " + ex.Message + "\n:::Skipping.\n";
+                    _report += "::Error: " + ex.Message + "\n:::Skipping.\n";
                 }
             }
 
-            SendReport(report);
+            sendReport(_report);
         }
 
         /// <summary>
         /// Sends a report to the operator of the bot
         /// </summary>
         /// <param name="report">the report to be sent</param>
-        private static void SendReport(string report)
+        private static void sendReport(string report)
         {
             try
             {
-                if (summaryEdit)
+                if (_summaryEdit)
                 {
-                    api.Edit(reportPage, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
-                    editCount++;
+                    _api.Edit(REPORT_PAGE, report + "\n--~~~~", "Report for " + DateTime.UtcNow.ToLongDateString() + " " + DateTime.UtcNow.ToShortTimeString(), MediaWikiApi.ACTION_EDIT_EXISTS_NOCHECK, false, true, MediaWikiApi.ACTION_EDIT_TEXT_REPLACE, MediaWikiApi.ACTION_EDIT_SECTION_NEW);
+                    _editCount++;
                 }
             }
             catch (MediaWikiException ex)
@@ -186,46 +178,48 @@ namespace StwalkerCoordBot
                 report += "Error saving report to wiki: " + ex.Message + "\n";
             }
 
-            System.Net.Mail.MailMessage mail = new System.Net.Mail.MailMessage("stwalkercoordbot@helpmebot.org.uk", reportEmail);
-            mail.Body = report;
-            mail.Subject = "StwalkerCoordBot report";
+            System.Net.Mail.MailMessage mail = new System.Net.Mail.MailMessage("stwalkercoordbot@helpmebot.org.uk", REPORT_EMAIL)
+                                                   {
+                                                       Body = report,
+                                                       Subject = "StwalkerCoordBot report"
+                                                   };
             System.Net.Mail.SmtpClient smtp = new System.Net.Mail.SmtpClient("helpmebot.org.uk");
             smtp.Send(mail);
         }
 
-        private static bool ApplyCoords(ref string wikitext, Location coords)
+        private static bool applyCoords(ref string wikitext, Location coords)
         {
             string wtBackup = wikitext;
 
-            if (Regex.IsMatch(wikitext, @"\{\{(nobots|bots\|(allow=none|deny=(?!none).*(" + username.Normalize() + @"|all)|optout=all))\}\}", RegexOptions.IgnoreCase))
+            if (Regex.IsMatch(wikitext, @"\{\{(nobots|bots\|(allow=none|deny=(?!none).*(" + _username.Normalize() + @"|all)|optout=all))\}\}", RegexOptions.IgnoreCase))
             {
-                report += "::Bot excluded from page.\n";
+                _report += "::Bot excluded from page.\n";
                 return false;
             }
 
             if (Regex.IsMatch(wikitext, @"\{\{[Cc]oord\|"))
             {
-                report += "::Already has coordinates template, skipping.\n";
+                _report += "::Already has coordinates template, skipping.\n";
                 return false;
             }
 
             string pattern = @"^\|[ ]*coordinates[ ]*=[ ]*$";
-            string replacement = "| coordinates = " + string.Format(coordInlineTitle, coords.Latitude, coords.Longitude);
+            string replacement = "| coordinates = " + string.Format(COORD_INLINE_TITLE, coords.latitude, coords.longitude);
             wikitext = Regex.Replace(wikitext, pattern, replacement, RegexOptions.Multiline);
 
             pattern = @"^\|[ ]*coords[ ]*=[ ]*$";
-            replacement = "| coords = " + string.Format(coordInlineTitle, coords.Latitude, coords.Longitude);
+            replacement = "| coords = " + string.Format(COORD_INLINE_TITLE, coords.latitude, coords.longitude);
             wikitext = Regex.Replace(wikitext, pattern, replacement, RegexOptions.Multiline);
 
             if (!wikitext.Equals(wtBackup))
             {
-                report += "::Added coordinates to infobox.(display=inline,title)\n";
+                _report += "::Added coordinates to infobox.(display=inline,title)\n";
             }
 
             else
             {
-                wikitext = wikitext + "\n\n" + string.Format(coordTitle, coords.Latitude, coords.Longitude);
-                report += "::Added coordinates to end of article.(display=title)\n";
+                wikitext = wikitext + "\n\n" + string.Format(COORD_TITLE, coords.latitude, coords.longitude);
+                _report += "::Added coordinates to end of article.(display=title)\n";
             }
 
             return true;
@@ -236,7 +230,7 @@ namespace StwalkerCoordBot
         /// </summary>
         /// <param name="filePath">Path of the KML file</param>
         /// <returns>a dictionary of required edits</returns>
-        private static Dictionary<string, Location> GetLocations(string filePath)
+        private static Dictionary<string, Location> getLocations(string filePath)
         {
             Dictionary<string, Location> locs = new Dictionary<string, Location>();
 
@@ -275,26 +269,19 @@ namespace StwalkerCoordBot
                 locs.Add(article, loc);
             }
 
-            report += string.Format(":Found {0} coordinate pairs.\n", locs.Count);
+            _report += string.Format(":Found {0} coordinate pairs.\n", locs.Count);
 
             return locs;
         }
 
         private static bool doEdit(string title, string text, string summary, int exists, bool minor, bool bot, int location, int section)
         {
-            if (editLimit == -1 || editLimit > ( summaryEdit ? editCount + 1 : editCount ))
-            {
-                if (doEdits)
-                    api.Edit(title, text, summary, exists, minor, bot, location, section);
+                if (_doEdits)
+                    _api.Edit(title, text, summary, exists, minor, bot, location, section);
                 else
-                    report += "::Editing disabled. Edit not saved.";
-                editCount++;
+                    _report += "::Editing disabled. Edit not saved.";
+                _editCount++;
                 return true;
-            }
-            else
-            {
-                return false;
-            }
         }
 
 
@@ -306,12 +293,12 @@ namespace StwalkerCoordBot
             /// <summary>
             /// The latitude of the location. Internal field, inaccessible
             /// </summary>
-            private float latitude;
+            private readonly float _latitude;
 
             /// <summary>
             /// The longitude of the location. Internal field, inaccessible
             /// </summary>
-            private float longitude;
+            private readonly float _longitude;
 
             /// <summary>
             /// Initializes a new instance of the Location struct.
@@ -320,29 +307,29 @@ namespace StwalkerCoordBot
             /// <param name="longitude">Longitude of the location</param>
             public Location(float latitude, float longitude)
             {
-                this.latitude = latitude;
-                this.longitude = longitude;
+                _latitude = latitude;
+                _longitude = longitude;
             }
 
             /// <summary>
             /// Gets the latitude of the location
             /// </summary>
-            public float Latitude
+            public float latitude
             {
                 get
                 {
-                    return this.latitude;
+                    return _latitude;
                 }
             }
 
             /// <summary>
             /// Gets the longitude of the location
             /// </summary>
-            public float Longitude
+            public float longitude
             {
                 get
                 {
-                    return this.longitude;
+                    return _longitude;
                 }
             }
         }
